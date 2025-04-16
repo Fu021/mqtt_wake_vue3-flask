@@ -1,0 +1,6 @@
+__pycache__
+node_modules
+dist
+.vscode
+mqtt_client.py
+devices.db
