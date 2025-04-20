@@ -8,6 +8,7 @@ import sqlite3
 CHECK_ALIVE = 0
 ALIVE = 1
 WAKE = 2
+WAKE_SEND = 3
 
 app = Flask(__name__)
 CORS(app)
@@ -36,7 +37,7 @@ class Backend:
         cursor.execute("SELECT * FROM devices")
         rows = cursor.fetchall()
         for row in rows:
-            self.device_info.append({'id':row[0],'name':row[1],'alive':0,'last_response_time':0})
+            self.device_info.append({'id':row[0],'name':row[1],'alive':0,'last_response_time':0,'wake_flag':0})
 
         db.close()
 
@@ -82,27 +83,29 @@ class Backend:
         while True:
             # 设备已经30s没有回应了
             for i in range(len(self.device_info)):
-                if time.time() - self.device_info[i]['last_response_time'] > 30:
+                if int(time.time()) - self.device_info[i]['last_response_time'] > 30:
                     self.device_info[i]['alive'] = 0
 
             if self.client.connected:
                 for i in range(len(self.device_info)):
-                    self.client.send({'id': self.device_info[i]['id'], 'msg': CHECK_ALIVE, 'time': time.time()})
+                    self.client.send({'id': self.device_info[i]['id'], 'msg': CHECK_ALIVE, 'time': int(time.time())})
                 time.sleep(5)
 
     def process_callback(self,msg):
         try:
-            if msg['time']-time.time() < 300 and msg['msg'] == ALIVE:
+            if msg['time']-int(time.time()) < 300 and msg['msg'] in [ALIVE,WAKE_SEND]:
                 for i in self.device_info:
                     if i['id'] == msg['id']:
                         i['alive'] = 1
-                        i['last_response_time'] = time.time()
+                        i['last_response_time'] = int(time.time())
+                        if msg['msg'] == WAKE_SEND:
+                            i['wake_flag'] = 1
                         break
         except:
             print(f"无法解析的消息:{msg}")
 
     def wake(self,id):
-        self.client.send({'id': id, 'msg': WAKE, 'time': time.time()})
+        self.client.send({'id': id, 'msg': WAKE, 'time': int(time.time())})
 
 backend = Backend()
 
@@ -122,7 +125,15 @@ def alive_send():
 def wake():
     msg = request.get_json()
     backend.wake(msg['id'])
-    return ""
+    time.sleep(1)
+    for i in backend.device_info:
+        if i['id'] == msg['id']:
+            if i['wake_flag']:
+                i['wake_flag'] = 0
+                return jsonify({'msg':1})
+            else:
+                return jsonify({'msg':0})
+    return jsonify({'msg':-1})
 
 @app.route('/api/get_info', methods=['GET'])
 def send_device_info():

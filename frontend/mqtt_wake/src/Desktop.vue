@@ -108,6 +108,28 @@ function check(id) {
 
 function wake(id) {
   axios.post(api_url + '/api/wake',{'id':id})
+  .then(res => {
+    if (res.data.msg === 1)
+    {
+      dialog_title.value = "提示"
+      dialog_content.value = "发送唤醒指令成功"
+      dialogVisible.value = true
+    }
+    else if (res.data.msg === 0)
+    {
+      dialog_title.value = "错误"
+      dialog_content.value = "发送失败，设备可能离线"
+      dialogVisible.value = true
+      get_info()
+    }
+    else
+    {
+      dialog_title.value = "错误"
+      dialog_content.value = "设备不存在，请刷新页面后重试"
+      dialogVisible.value = true
+      get_info()
+    }
+  })
 }
 
 function get_info() {
